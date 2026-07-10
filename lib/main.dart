@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const AdvancedMoneyTracker());
@@ -26,7 +28,7 @@ class ExpenseItem {
   final double amount;
   final String category;
   final DateTime date;
-  final bool isIncome; // لتحديد هل هي إضافة فلوس ولا صرف
+  final bool isIncome;
 
   ExpenseItem({
     required this.title,
@@ -35,6 +37,28 @@ class ExpenseItem {
     required this.date,
     required this.isIncome,
   });
+
+  // تحويل البيانات لنصوص ليتم حفظها في الجهاز
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'amount': amount,
+      'category': category,
+      'date': date.toIso8601String(),
+      'isIncome': isIncome,
+    };
+  }
+
+  // استرجاع البيانات وتحويلها لكائنات مجدداً عند فتح البرنامج
+  factory ExpenseItem.fromMap(Map<String, dynamic> map) {
+    return ExpenseItem(
+      title: map['title'],
+      amount: map['amount'],
+      category: map['category'],
+      date: DateTime.parse(map['date']),
+      isIncome: map['isIncome'],
+    );
+  }
 }
 
 class MainScreen extends StatefulWidget {
@@ -45,15 +69,42 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  double _totalBudget = 1000.0; // الميزانية الابتدائية
-  final List<ExpenseItem> _expenses = []; 
+  double _totalBudget = 1000.0;
+  List<ExpenseItem> _expenses = []; 
 
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
-  final _budgetController = TextEditingController(); // كنترولر للتحكم في الميزانية
+  final _budgetController = TextEditingController();
   String _selectedCategory = 'أكل وشرب';
 
   final List<String> _categories = ['أكل وشرب', 'مواصلات', 'ألعاب وترفيه', 'دراسة ودروس', 'أخرى'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData(); // قراءة العمليات القديمة أول ما البرنامج يفتح
+  }
+
+  // دالة تحميل البيانات من ذاكرة التخزين
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _totalBudget = prefs.getDouble('total_budget') ?? 1000.0;
+      final String? expensesString = prefs.getString('expenses_list');
+      if (expensesString != null) {
+        final List<dynamic> decodedList = jsonDecode(expensesString);
+        _expenses = decodedList.map((item) => ExpenseItem.fromMap(item)).toList();
+      }
+    });
+  }
+
+  // دالة الحفظ التلقائي في ذاكرة التخزين
+  Future<void> _saveData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('total_budget', _totalBudget);
+    final List<Map<String, dynamic>> encodedList = _expenses.map((item) => item.toMap()).toList();
+    await prefs.setString('expenses_list', jsonEncode(encodedList));
+  }
 
   // دالة تسجيل المصاريف (خصم)
   void _addExpense() {
@@ -80,15 +131,16 @@ class _MainScreenState extends State<MainScreen> {
 
     _titleController.clear();
     _amountController.clear();
+    _saveData(); // حفظ البيانات فوراً بعد الخصم
   }
 
-  // دالة التحكم في الميزانية وزيادتها
+  // دالة التحكم في الميزانية وزيادتها (إيداع)
   void _updateBudget() {
     final enteredBudget = double.tryParse(_budgetController.text) ?? 0.0;
     if (enteredBudget <= 0) return;
 
     setState(() {
-      _totalBudget += enteredBudget; // هيزود المبلغ اللي كتبته على ميزانيتك الحالية
+      _totalBudget += enteredBudget; 
       _expenses.insert(
         0,
         ExpenseItem(
@@ -101,6 +153,7 @@ class _MainScreenState extends State<MainScreen> {
       );
     });
     _budgetController.clear();
+    _saveData(); // حفظ البيانات فوراً بعد الإيداع
   }
 
   @override
@@ -138,7 +191,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             const SizedBox(height: 15),
             
-            // القسم الجديد: التحكم في الميزانية وزيادتها
+            // إضافة ميزانية جديدة
             Card(
               color: Colors.teal.shade50,
               child: Padding(
@@ -218,7 +271,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             const SizedBox(height: 5),
             
-            // قائمة العمليات (عرض المصاريف باللون الأحمر، والإيداع باللون الأخضر دقة عالية)
+            // قائمة عرض العمليات
             Expanded(
               child: _expenses.isEmpty
                   ? const Center(child: Text('لم يتم تسجيل أي عمليات حتى الآن.'))
