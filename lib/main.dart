@@ -106,6 +106,7 @@ class _MainScreenState extends State<MainScreen> {
         'expenses_list', jsonEncode(_expenses.map((e) => e.toMap()).toList()));
   }
 
+  // دالة لإضافة مصروف جديد وتقليل الميزانية
   void _addExpense() {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
     if (_titleController.text.isEmpty || amount <= 0 || amount > _totalBudget) {
@@ -129,6 +130,30 @@ class _MainScreenState extends State<MainScreen> {
     _amountController.clear();
   }
 
+  // دالة جديدة لإيداع أموال وزيادة الميزانية
+  void _addIncome() {
+    final amount = double.tryParse(_amountController.text) ?? 0.0;
+    if (_titleController.text.isEmpty || amount <= 0) {
+      return;
+    }
+    setState(() {
+      _totalBudget += amount;
+      _expenses.insert(
+        0,
+        ExpenseItem(
+          title: 'إيداع: ${_titleController.text}',
+          amount: amount,
+          category: 'إيداع',
+          date: DateTime.now(),
+          isIncome: true,
+        ),
+      );
+    });
+    _saveData();
+    _titleController.clear();
+    _amountController.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filterCategory == 'الكل'
@@ -142,13 +167,13 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           children: [
             Text(
-              'الميزانية: ${_totalBudget.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              'الميزانية: ${_totalBudget.toStringAsFixed(2)} ج.م',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.teal),
             ),
             const SizedBox(height: 10),
             TextField(
                 controller: _titleController,
-                decoration: const InputDecoration(labelText: 'الاسم')),
+                decoration: const InputDecoration(labelText: 'البيان أو الاسم')),
             TextField(
                 controller: _amountController,
                 decoration: const InputDecoration(labelText: 'المبلغ'),
@@ -161,12 +186,28 @@ class _MainScreenState extends State<MainScreen> {
                   .toList(),
               onChanged: (v) => setState(() => _selectedCategory = v!),
             ),
-            ElevatedButton(
-                onPressed: _addExpense, child: const Text('إضافة')),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _addExpense,
+                  icon: const Icon(Icons.remove),
+                  label: const Text('صرف'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _addIncome,
+                  icon: const Icon(Icons.add),
+                  label: const Text('إيداع'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                ),
+              ],
+            ),
             const Divider(),
             DropdownButton<String>(
               value: _filterCategory,
-              items: ['الكل', ..._categories]
+              items: ['الكل', 'إيداع', ..._categories]
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
               onChanged: (v) => setState(() => _filterCategory = v!),
@@ -179,11 +220,11 @@ class _MainScreenState extends State<MainScreen> {
                   title: Text(filtered[i].title),
                   subtitle: Text(filtered[i].category),
                   trailing: Text(
-                    '${filtered[i].amount.toStringAsFixed(2)} ج.م',
-                    style: const TextStyle(
+                    '${filtered[i].isIncome ? "+" : "-"}${filtered[i].amount.toStringAsFixed(2)} ج.م',
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: Colors.teal,
+                      color: filtered[i].isIncome ? Colors.green : Colors.red,
                     ),
                   ),
                 ),
