@@ -343,7 +343,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// شاشة عرض كود HTML / CSS / JavaScript
 class LocalWebScreen extends StatefulWidget {
   const LocalWebScreen({super.key});
 
